@@ -46,13 +46,17 @@ class HalRenderer implements RenderInterface
      * {@inheritdoc}
      */
     public function render(ResourceObject $ro) {
-        return $this->renderInternal($ro, $ro);
+        list($ro, $body) = $this->valuate(
+            $ro, 
+            function ($rel, $value) use(&$ro) { $ro->body['_embedded'][$rel] = $value; }
+        );
+
+        return $this->renderInternal($ro, $body);
     }
     
-    private function renderInternal(ResourceObject $parent, ResourceObject $ro)
+    // private function renderInternal(ResourceObject $ro, callable $aggregator)
+    private function renderInternal(ResourceObject $ro, array $body)
     {
-        list($ro, $body) = $this->valuate($parent, $ro);
-
         $method = 'on' . ucfirst($ro->uri->method);
         $hasMethod = method_exists($ro, $method);
         if (! $hasMethod) {
@@ -74,17 +78,23 @@ class HalRenderer implements RenderInterface
     /**
      * @param \BEAR\Resource\ResourceObject $ro
      */
-    private function valuateElements(ResourceObject &$parent, ResourceObject $ro)
+    private function valuateElements(ResourceObject $ro, callable $aggregator)
     {
         foreach ($ro->body as $key => &$element) {
             if ($element instanceof RequestInterface) {
                 unset($ro->body[$key]);
-                $view = $this->renderInternal($ro, $element());
-                $parent->body['_embedded'][$key] = json_decode($view);
+                $itemResource = $element();
+
+                list($itemResource, $body) = $this->valuate(
+                    $itemResource, 
+                    function ($rel, $value) use(&$itemResource) { $itemResource->body[$rel] = $value; }
+                );
+
+                $aggregator($key, json_decode($this->renderInternal($itemResource, $body)));
             }
             else if ($element instanceof ItemResourceGenerator) {
                 unset($ro->body[$key]);
-                $parent->body['_embedded'][$key] = $this->valuateItemResources($element);
+                $aggregator($key, $this->valuateItemResources($element));
             }
         }
     }
@@ -92,7 +102,7 @@ class HalRenderer implements RenderInterface
     private function valuateItemResources(ItemResourceGenerator $generator) {
         $items = [];
         foreach ($generator->resources() as $ro) {
-            $items[] = json_decode($this->renderInternal($ro, $ro));
+            $items[] = json_decode($this->render($ro));
         }
         
         return $items;
@@ -139,11 +149,11 @@ class HalRenderer implements RenderInterface
      *
      * @return array
      */
-    private function valuate(ResourceObject $parent, ResourceObject $ro)
+    private function valuate(ResourceObject $ro, callable $aggregator)
     {
         // evaluate all request in body.
         if (is_array($ro->body)) {
-            $this->valuateElements($parent, $ro);
+            $this->valuateElements($ro, $aggregator);
         }
         // HAL
         $body = $ro->body ?: [];
