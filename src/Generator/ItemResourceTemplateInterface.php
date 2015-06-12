@@ -4,10 +4,12 @@ namespace Embed\Sample\Generator;
 
 use BEAR\Resource\ResourceObject;
 
-interface ItemResourceTemplateInterface {
+interface ItemResourceTemplateInterface
+{
     /**
      * @param mixed value
+     *
      * @return ResourceObject
      */
-    function asResource($value);
+    public function asResource($value);
 }

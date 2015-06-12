@@ -1,6 +1,7 @@
 <?php
+
 /**
- * This file is part of the BEAR.Resource package
+ * This file is part of the BEAR.Resource package.
  *
  * @license http://opensource.org/licenses/MIT MIT
  */
@@ -14,11 +15,10 @@ use BEAR\Resource\Uri;
 use BEAR\Sunday\Extension\Router\RouterInterface;
 use Doctrine\Common\Annotations\Reader;
 use Nocarrier\Hal;
-
 use Embed\Sample\Generator\ItemResourceGenerator;
 
 /**
- * HAL(Hypertext Application Language) renderer
+ * HAL(Hypertext Application Language) renderer.
  */
 class HalRenderer implements RenderInterface
 {
@@ -45,31 +45,33 @@ class HalRenderer implements RenderInterface
     /**
      * {@inheritdoc}
      */
-    public function render(ResourceObject $ro) {
+    public function render(ResourceObject $ro)
+    {
         list($ro, $body) = $this->valuate(
-            $ro, 
-            function ($rel, $value) use(&$ro) { $ro->body['_embedded'][$rel] = $value; }
+            $ro,
+            function ($rel, $value) use (&$ro) { $ro->body['_embedded'][$rel] = $value; }
         );
 
         return $this->renderInternal($ro, $body);
     }
-    
+
     // private function renderInternal(ResourceObject $ro, callable $aggregator)
     private function renderInternal(ResourceObject $ro, array $body)
     {
-        $method = 'on' . ucfirst($ro->uri->method);
+        $method = 'on'.ucfirst($ro->uri->method);
         $hasMethod = method_exists($ro, $method);
-        if (! $hasMethod) {
+        if (!$hasMethod) {
             $ro->view = ''; // OPTIONS request no view
 
             return '';
         }
-        $links = ($hasMethod) ? $this->reader->getMethodAnnotations(new \ReflectionMethod($ro, $method), Link::class) : [];
+        $links =
+            $hasMethod ? $this->reader->getMethodAnnotations(new \ReflectionMethod($ro, $method), Link::class) : [];
         /* @var $links Link[] */
         /* @var $ro ResourceObject */
         $linkValue = $body + $ro->uri->query;
         $hal = $this->getHal($ro->uri, $linkValue, $links);
-        $ro->view = $hal->asJson(true) . PHP_EOL;
+        $ro->view = $hal->asJson(true).PHP_EOL;
         $ro->headers['content-type'] = 'application/hal+json';
 
         return $ro->view;
@@ -86,28 +88,28 @@ class HalRenderer implements RenderInterface
                 $itemResource = $element();
 
                 list($itemResource, $body) = $this->valuate(
-                    $itemResource, 
-                    function ($rel, $value) use(&$itemResource) { $itemResource->body[$rel] = $value; }
+                    $itemResource,
+                    function ($rel, $value) use (&$itemResource) { $itemResource->body[$rel] = $value; }
                 );
 
                 $aggregator($key, json_decode($this->renderInternal($itemResource, $body)));
-            }
-            else if ($element instanceof ItemResourceGenerator) {
+            } elseif ($element instanceof ItemResourceGenerator) {
                 unset($ro->body[$key]);
                 $aggregator($key, $this->valuateItemResources($element));
             }
         }
     }
-    
-    private function valuateItemResources(ItemResourceGenerator $generator) {
+
+    private function valuateItemResources(ItemResourceGenerator $generator)
+    {
         $items = [];
         foreach ($generator->resources() as $ro) {
             $items[] = json_decode($this->render($ro));
         }
-        
+
         return $items;
     }
-    
+
     /**
      * @param Uri   $uri
      * @param array $linkValue
@@ -117,8 +119,8 @@ class HalRenderer implements RenderInterface
      */
     private function getHal(Uri $uri, array $linkValue, array $links)
     {
-        $query = $uri->query ? '?' . http_build_query($uri->query) : '';
-        $path = $uri->path . $query;
+        $query = $uri->query ? '?'.http_build_query($uri->query) : '';
+        $path = $uri->path.$query;
         $selfLink = $this->getReverseMatchedLink($path);
         $hal = new Hal($selfLink, $linkValue);
         $this->getHalLink($linkValue, $links, $hal);
